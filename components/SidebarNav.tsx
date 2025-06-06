@@ -1,7 +1,7 @@
 
 import React from 'react';
 import {
-    HPDSKLogoIcon, Bars3Icon, ArrowLeftIcon, LifebuoyIcon
+    HPDSKLogoIcon, Bars3Icon, ArrowLeftIcon, LifebuoyIcon, ArrowRightOnRectangleIcon
 } from './icons';
 import type { ViewMode, NavigationItemConfig } from '../types'; 
 
@@ -11,6 +11,7 @@ interface SidebarNavProps {
   currentView: ViewMode;
   onNavigate: (viewMode: ViewMode) => void;
   navItems: NavigationItemConfig[]; 
+  onLogout: () => void;
 }
 
 const NavItem: React.FC<{
@@ -55,7 +56,7 @@ const NavItem: React.FC<{
 
 
 const SidebarNav: React.FC<SidebarNavProps> = ({ 
-    isOpen, toggleSidebar, currentView, onNavigate, navItems
+    isOpen, toggleSidebar, currentView, onNavigate, navItems, onLogout
 }) => {
   const sidebarWidth = isOpen ? 'w-60' : 'w-20';
 
@@ -99,9 +100,18 @@ const SidebarNav: React.FC<SidebarNavProps> = ({
       </nav>
 
       <div className="p-3 border-t border-gray-700">
+         <button
+          onClick={onLogout}
+          className="mb-2 w-full flex items-center px-3 py-3 text-gray-300 hover:bg-red-700 hover:text-white rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-400"
+          aria-label="Sair da aplicação"
+          title="Sair"
+        >
+          <ArrowRightOnRectangleIcon className={`flex-shrink-0 w-6 h-6 ${isOpen ? 'mr-3' : 'mx-auto'}`} />
+          {isOpen && <span className="text-sm font-medium">Sair</span>}
+        </button>
         <button
           onClick={toggleSidebar}
-          className="mt-2 w-full flex items-center px-3 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400"
+          className="w-full flex items-center px-3 py-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400"
           aria-label={isOpen ? "Recolher menu lateral" : "Expandir menu lateral"}
           aria-expanded={isOpen}
           title={isOpen ? "Recolher" : "Expandir"}

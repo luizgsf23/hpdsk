@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Chat, Content } from "@google/genai"; // Added Content
-import type { GenerateContentResponse } from "@google/genai";
+import type { GenerateContentResponse, Session } from "@google/genai"; // Assuming Session from genai is what you might need, adjust if it's from Supabase
 import { 
     Ticket, Message, TicketStatus, IssueCategory, UrgencyLevel, ReportTimeFrame, ReportData,
     Task, TaskStatus as TaskStatusEnum, TaskPriority, TaskClassification,
@@ -14,6 +14,7 @@ import { reportService } from './services/reportService';
 import { supabase } from './services/supabaseClient'; 
 import { hasConfigErrors } from './services/configStatus'; 
 import ConfigurationErrorPage from './components/ConfigurationErrorPage'; 
+import LoginPage from './components/LoginPage';
 import FeedbackAlert from './components/FeedbackAlert'; 
 import TicketList from './components/TicketList';
 import TicketForm, { TicketFormData as AppTicketFormData } from './components/TicketForm'; 
@@ -39,7 +40,8 @@ import {
     geminiInitializationError 
 } from './services/geminiService';
 import { HELP_DESK_SYSTEM_INSTRUCTION, HELP_APP_SYSTEM_INSTRUCTION } from './constants';
-import { ChartBarIcon, TicketIcon, ClipboardDocumentListIcon, ArchiveBoxIcon, DocumentTextIcon, DocumentDuplicateIcon, LifebuoyIcon } from './components/icons';
+import { ChartBarIcon, TicketIcon, ClipboardDocumentListIcon, ArchiveBoxIcon, DocumentTextIcon, DocumentDuplicateIcon, LifebuoyIcon, HPDSKLogoIcon } from './components/icons';
+
 
 export interface AppFeedback {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -82,6 +84,10 @@ export const App: React.FC = () => {
   if (hasConfigErrors) {
     return <ConfigurationErrorPage />;
   }
+  
+  const [session, setSession] = useState<Session | null>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -119,6 +125,31 @@ export const App: React.FC = () => {
   const activeChatsRef = useRef<Map<string, Chat>>(new Map());
   
   useEffect(() => {
+    if (!supabase) {
+      setIsSessionLoading(false);
+      return;
+    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session as any); // Cast to any if Supabase Session type conflicts
+      setIsSessionLoading(false);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session as any); // Cast to any if Supabase Session type conflicts
+        setIsSessionLoading(false);
+        if (!session) { // If user logs out, redirect to home (which will become login)
+            setCurrentAppViewInternal('home');
+        }
+      }
+    );
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, []);
+
+
+  useEffect(() => {
     const storedFeedback = sessionStorage.getItem('appFeedback');
     if (storedFeedback) {
       try {
@@ -132,8 +163,12 @@ export const App: React.FC = () => {
   }, [currentAppView]);
 
  useEffect(() => {
-    if (!supabase) { 
+    if (!supabase || !session) {  // Don't fetch if no session
       setIsLoading(false);
+      setTickets([]);
+      setTasks([]);
+      setEquipmentItems([]);
+      setContracts([]);
       return;
     }
     
@@ -215,10 +250,10 @@ export const App: React.FC = () => {
     if (shouldFetchContracts) fetchContractsScoped();
 
     return () => { isActive = false; };
-  }, [currentAppView, supabase]);
+  }, [currentAppView, supabase, session]); // Add session as a dependency
 
   const fetchTasksScoped = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !session) return; // Check session
     setIsTaskLoading(true);
     const { data, error } = await supabase.from('tasks').select('*')
       .order('created_at', { ascending: false });
@@ -254,11 +289,11 @@ export const App: React.FC = () => {
       setTasks([]);
     }
     setIsTaskLoading(false);
-  }, [supabase]);
+  }, [supabase, session]); // Add session
 
 
   const fetchEquipmentItemsScoped = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !session) return; // Check session
     setIsEquipmentLoading(true);
     const { data, error } = await supabase.from('equipment_items').select('*')
       .order('created_at', { ascending: false });
@@ -272,10 +307,10 @@ export const App: React.FC = () => {
         setEquipmentItems([]);
     }
     setIsEquipmentLoading(false);
-  }, [supabase]);
+  }, [supabase, session]); // Add session
 
   const fetchContractsScoped = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !session) return; // Check session
     setIsContractsLoading(true);
     const { data, error } = await supabase.from('contracts').select('*')
       .order('renewal_or_expiry_date', { ascending: true });
@@ -290,7 +325,7 @@ export const App: React.FC = () => {
         setContracts(mappedData.map(c => parseSupabaseDataDates(c, ['created_at', 'updated_at', 'startDate', 'renewalOrExpiryDate', 'endDate'])) as Contract[]);
     }
     setIsContractsLoading(false);
-  }, [supabase]);
+  }, [supabase, session]); // Add session
 
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
@@ -303,6 +338,19 @@ export const App: React.FC = () => {
       setReportData(null); 
       setViewMode(newMode);
   };
+  
+  const handleLogout = async () => {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        setGlobalAppFeedback({type: 'error', message: `Erro ao sair: ${error.message}`});
+    } else {
+        setSession(null); // Should be handled by onAuthStateChange, but good for immediate UI update
+        setCurrentAppViewInternal('home'); // Navigate to home, which will show login
+        setGlobalAppFeedback({type: 'success', message: 'Você saiu com sucesso.'});
+    }
+  };
+
 
   const handleChangeTicketStatus = async (ticketId: string, newStatus: TicketStatus): Promise<AppFeedback> => {
     if (!supabase) return { type: 'error', message: "Cliente Supabase não inicializado."};
@@ -744,6 +792,20 @@ Por favor, acuse o recebimento deste ticket, cumprimente o usuário ${newTicketF
     ) ||
     (currentAppView === 'inventoryDashboard' && isEquipmentLoading && equipmentItems.length === 0);
 
+  if (isSessionLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white">
+        <HPDSKLogoIcon className="w-20 h-20 mb-4 animate-pulse" />
+        <LoadingSpinner size="w-10 h-10" />
+        <p className="mt-3 text-lg">Verificando sessão...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginPage supabaseClient={supabase} setGlobalAppFeedback={setGlobalAppFeedback} />;
+  }
+  
   return (
     <div className="min-h-screen flex bg-gray-900 text-gray-100 transition-colors duration-300">
       <SidebarNav
@@ -752,6 +814,7 @@ Por favor, acuse o recebimento deste ticket, cumprimente o usuário ${newTicketF
         currentView={currentAppView}
         onNavigate={handleSidebarNavigate}
         navItems={mainNavItemsConfig} 
+        onLogout={handleLogout}
       />
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${mainContentMargin}`}>
         {globalAppFeedback && (
