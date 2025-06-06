@@ -1,0 +1,6 @@
+{
+  "name": "HPDSK",
+  "description": "A React application for managing IT support tickets with AI assistance.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

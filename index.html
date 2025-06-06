@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HPDSK - Helpdesk TI IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Initialize process.env for the browser if it doesn't exist.
+      // This makes environment-like variables available to the application scripts.
+      if (typeof window.process === 'undefined') {
+        window.process = {};
+      }
+      if (typeof window.process.env === 'undefined') {
+        window.process.env = {};
+      }
+
+      // --- Vercel Environment Variable Configuration ---
+      // This application requires API keys and service URLs to be configured in your Vercel project's Environment Variables.
+      // For this static deployment, you MUST manually copy the values from your Vercel dashboard
+      // and paste them into the corresponding string literals below BEFORE deploying.
+
+      // 1. In Vercel, define an Environment Variable for your Gemini API Key.
+      //    Recommended Vercel Variable Name: API_KEY
+      //    Then, copy its value and paste it below.
+      window.process.env.API_KEY = "AIzaSyAPu4znvuoq0FAyHUH9vC0HA-QekceN2rY"; // KEEPING EXISTING GEMINI KEY
+
+      // 2. In Vercel, define an Environment Variable for your Supabase Project URL.
+      //    Recommended Vercel Variable Name: SUPABASE_URL
+      //    Then, copy its value and paste it below.
+      window.process.env.SUPABASE_URL = "https://geoooccziwigojtqyhln.supabase.co";
+
+      // 3. In Vercel, define an Environment Variable for your Supabase Anon Key.
+      //    Recommended Vercel Variable Name: SUPABASE_ANON_KEY
+      //    Then, copy its value and paste it below.
+      window.process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlb29vY2N6aXdpZ29qdHF5aGxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyMjAxOTUsImV4cCI6MjA2NDc5NjE5NX0.HKB1VA-k6aF2b5u0ipi8D3kPElNrJQDX5lAUBIDqYqk";
+
+      // The application's JavaScript code (e.g., in services/geminiService.ts, services/supabaseClient.ts)
+      // will read these values from window.process.env.
+      // Ensure these values are correct for the application to function.
+      // If any of these are missing or incorrect, the application may not work as expected.
+      
+      // Example of filled values (REPLACE THESE WITH YOUR ACTUAL VALUES FROM VERCEL AFTER SETTING THEM UP):
+      // window.process.env.API_KEY = "AIzaSy........................"; // Example: Your Gemini API Key
+      // window.process.env.SUPABASE_URL = "https://your-project-ref.supabase.co"; // Example: Your Supabase Project URL
+      // window.process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX................"; // Example: Your Supabase Anon Key
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.2.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0",
+    "jspdf": "https://esm.sh/jspdf@^2.5.1",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "react-dom": "https://esm.sh/react-dom@^19.1.0",
+    "@supabase/gotrue-js": "https://esm.sh/@supabase/gotrue-js@^2.70.0"
+  }
+}
+</script>
+<style>
+  #initial-load-indicator {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    text-align: center;
+    padding: 50px 20px;
+    color: #D1D5DB; /* Tailwind gray-300 */
+  }
+  #initial-load-indicator p {
+    margin-bottom: 0.5rem;
+  }
+  #initial-load-indicator .spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1); /* Lighter border for dark theme */
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: #A855F7; /* Tailwind purple-500 */
+    animation: spin 1s ease infinite;
+    margin: 20px auto;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @media print {
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background-color: white !important;
+      -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
+      print-color-adjust: exact !important; /* Firefox, Standard */
+    }
+
+    .print\\:hidden {
+      display: none !important;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+    
+    #root,
+    #root > div, 
+    #root > div > main, 
+    #root > div > main > div, 
+    #report-content, #report-content * {
+      visibility: visible !important;
+    }
+
+    #root, #root > div, #root > div > main, #root > div > main > div {
+      background-color: white !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important; 
+    }
+    
+    #report-content {
+      position: static !important; 
+      width: 100% !important; 
+      margin: 0 !important;
+      padding: 0 !important; 
+      box-shadow: none !important;
+      border: none !important;
+      border-radius: 0 !important;
+      background-color: white !important;
+    }
+
+    #report-content * {
+      color: black !important; 
+      background-color: transparent !important; 
+    }
+    
+    /* Update specific Tailwind colors for print based on new theme if needed */
+    #report-content .bg-purple-500 { background-color: #a855f7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .text-purple-500 { color: #a855f7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .bg-purple-600 { background-color: #9333ea !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .text-purple-600 { color: #9333ea !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    /* Other colors - map from old (blue, green etc) to new (purple or keep if semantic like red) */
+    #report-content .bg-blue-500 { background-color: #a855f7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } /* Was blue, now purple */
+    #report-content .text-blue-500 { color: #a855f7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    #report-content .bg-green-500 { background-color: #8b5cf6 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } /* Was green, now a different purple/indigo */
+    #report-content .text-green-500 { color: #8b5cf6 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    #report-content .bg-red-500 { background-color: #ef4444 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .text-red-500 { color: #ef4444 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    #report-content .bg-orange-500 { background-color: #f97316 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .text-orange-500 { color: #f97316 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    #report-content .bg-yellow-500 { background-color: #eab308 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .text-yellow-500 { color: #eab308 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    
+    #report-content .bg-gray-500, #report-content .bg-slate-500, #report-content .bg-slate-600 { background-color: #6b7280 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #report-content .text-gray-500, #report-content .text-slate-500, #report-content .text-slate-600 { color: #6b7280 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    #report-content .text-white { 
+        color: white !important; 
+        -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    }
+    
+    #report-content h1, #report-content h2, #report-content h3, #report-content h4, 
+    #report-content p, #report-content span, #report-content li,
+    #report-content .text-gray-800, #report-content .text-gray-700, 
+    #report-content .text-gray-600, #report-content .text-gray-900 {
+      color: black !important;
+    }
+    #report-content strong {
+      font-weight: bold !important;
+      color: black !important; 
+    }
+    
+    #report-content svg:not([class*="text-red-500"]):not([class*="text-orange-500"]):not([class*="text-yellow-500"]):not([class*="text-green-500"]):not([class*="text-blue-500"]):not([class*="text-purple-500"]):not([class*="text-slate-500"]):not([class*="text-gray-500"]) {
+      color: black !important; 
+    }
+
+    @page {
+      size: A4;
+      margin: 1.5cm; 
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      page-break-after: avoid;
+      page-break-inside: avoid;
+    }
+    section, div.grid, figure, table, pre, ul, ol, li, img {
+      page-break-inside: avoid;
+    }
+    
+    #report-content .shadow-lg, 
+    #report-content .shadow-xl, 
+    #report-content .shadow-md,
+    #report-content .shadow-inner {
+      box-shadow: none !important;
+    }
+    
+    #report-content .bg-white, 
+    #report-content .bg-gray-50, 
+    #report-content .bg-gray-100,
+    #report-content .bg-gray-800, /* Added for dark theme card bg if needed in print */
+    #report-content .bg-white\\/30
+     {
+      background-color: white !important;
+    }
+
+    #report-content [class*="StatCard"] { 
+      border: 1px solid #e5e7eb !important; 
+      padding: 0.75rem !important;
+    }
+
+    #report-content .ai-insights-section .ai-insights-content {
+      background-color: #f8f9fa !important; 
+      border: 1px solid #dee2e6 !important;
+      padding: 1em !important;
+      white-space: pre-wrap !important; 
+      word-wrap: break-word !important;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace !important;
+      font-size: 9pt !important; 
+      line-height: 1.4 !important;
+      color: black !important;
+    }
+    #report-content .ai-insights-section .ai-insights-content strong {
+      font-weight: bold !important;
+      color: black !important;
+    }
+  }
+</style>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-900">
+    <div id="root">
+      <div id="initial-load-indicator">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Carregando aplicação HPDSK...</p>
+        <p>Se esta mensagem persistir por muito tempo, pode haver um problema ao carregar os recursos essenciais ou uma falha de conexão com a internet.</p>
+        <p>Por favor, verifique sua conexão e o console do navegador para mais detalhes sobre erros.</p>
+      </div>
+    </div>
+    <script type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
