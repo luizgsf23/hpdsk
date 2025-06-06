@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas';
 import { ReportData, ReportTimeFrame, Ticket, IssueCategory, UrgencyLevel, TicketStatus } from '../types';
 import LoadingSpinner from './LoadingSpinner';
 import FeedbackAlert from './FeedbackAlert'; 
-import type { AppFeedback } from '../App'; 
+import type { AppFeedback } from '../types'; 
 import { 
     CalendarDaysIcon, DocumentTextIcon, SparklesIcon, CheckCircleIcon, ClockIcon, XMarkIcon, 
     BoltIcon, ExclamationTriangleIcon, Bars3BottomLeftIcon, EllipsisHorizontalIcon, 
@@ -34,8 +34,8 @@ const TimeFrameButtonInner: React.FC<TimeFrameButtonProps> = ({ timeFrame, label
     onClick={() => onClick(timeFrame)}
     disabled={disabled}
     className={`
-      px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-150 ease-in-out
-      border
+      px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium rounded-md transition-all duration-150 ease-in-out
+      border w-full
       ${isSelected 
         ? 'bg-purple-600 text-white border-purple-500 shadow-md' 
         : `bg-gray-700 text-gray-200 border-gray-600 
@@ -202,10 +202,10 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ reportData, isReportLoading, 
   };
 
   return (
-    <div className="p-2 sm:p-6 bg-gray-900 rounded-lg shadow-xl h-full flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
-      <div className="flex items-center justify-between mb-2 pb-4 border-b border-gray-700 print:hidden">
-        <h2 className="text-2xl sm:text-3xl font-semibold text-purple-400 flex items-center">
-          <DocumentTextIcon className="w-8 h-8 mr-3 text-purple-400" />
+    <div className="p-2 sm:p-4 md:p-6 bg-gray-900 rounded-lg shadow-xl h-full flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-2 pb-3 sm:pb-4 border-b border-gray-700 print:hidden">
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-purple-400 flex items-center mb-2 sm:mb-0">
+          <DocumentTextIcon className="w-7 h-7 sm:w-8 sm:h-8 mr-2 sm:mr-3 text-purple-400" />
           Central de Relatórios
         </h2>
       </div>
@@ -219,12 +219,12 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ reportData, isReportLoading, 
           />
       )}
 
-      <div className="mb-6 p-4 bg-gray-800 rounded-lg print:hidden">
-        <h3 className="text-lg font-medium text-gray-200 mb-3 flex items-center">
+      <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-800 rounded-lg print:hidden">
+        <h3 className="text-md sm:text-lg font-medium text-gray-200 mb-2 sm:mb-3 flex items-center">
             <CalendarDaysIcon className="w-5 h-5 mr-2 text-gray-400"/>
             Selecione o Período do Relatório:
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
           {Object.values(ReportTimeFrame).map(tf => (
             <TimeFrameButton
               key={tf} timeFrame={tf} label={tf}
@@ -236,48 +236,48 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ reportData, isReportLoading, 
         <button
           onClick={handleGenerateClick}
           disabled={!selectedTimeFrame || isReportLoading || isGeneratingPdf}
-          className="mt-4 w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-3 sm:mt-4 w-full sm:w-auto px-4 py-2 sm:px-6 sm:py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
         >
           {isReportLoading ? <LoadingSpinner size="w-5 h-5" /> : "Gerar Relatório"}
         </button>
       </div>
 
       {isReportLoading && (
-        <div className="flex-grow flex flex-col items-center justify-center text-gray-200 p-10 print:hidden">
-          <LoadingSpinner size="w-12 h-12" />
-          <p className="mt-4 text-lg">Gerando relatório, por favor aguarde...</p>
-          <p className="text-sm text-gray-400">Isso pode levar alguns instantes, especialmente para períodos mais longos.</p>
+        <div className="flex-grow flex flex-col items-center justify-center text-gray-200 p-6 sm:p-10 print:hidden">
+          <LoadingSpinner size="w-10 h-10 sm:w-12 sm:h-12" />
+          <p className="mt-3 sm:mt-4 text-md sm:text-lg">Gerando relatório, por favor aguarde...</p>
+          <p className="text-xs sm:text-sm text-gray-400">Isso pode levar alguns instantes.</p>
         </div>
       )}
 
       {!isReportLoading && !reportData && !feedback && ( 
-        <div className="flex-grow flex flex-col items-center justify-center text-gray-400 bg-gray-800/50 rounded-lg p-10 text-center print:hidden">
-          <InformationCircleIcon className="w-16 h-16 text-gray-500 mb-6" />
-          <p className="text-xl text-gray-200 mb-2">Nenhum relatório gerado.</p>
-          <p className="text-sm">Selecione um período acima e clique em "Gerar Relatório" para visualizar os dados e insights.</p>
+        <div className="flex-grow flex flex-col items-center justify-center text-gray-400 bg-gray-800/50 rounded-lg p-6 sm:p-10 text-center print:hidden">
+          <InformationCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500 mb-4 sm:mb-6" />
+          <p className="text-lg sm:text-xl text-gray-200 mb-2">Nenhum relatório gerado.</p>
+          <p className="text-xs sm:text-sm">Selecione um período e clique em "Gerar Relatório".</p>
         </div>
       )}
 
       {!isReportLoading && reportData && (
-        <div className="space-y-8" id="report-content-wrapper">
-          <div className="flex justify-between items-center border-b border-gray-700 pb-2">
-            <h3 className="text-2xl font-semibold text-purple-400">
+        <div className="space-y-6 sm:space-y-8" id="report-content-wrapper">
+          <div className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-700 pb-2 mb-4 sm:mb-0">
+            <h3 className="text-xl sm:text-2xl font-semibold text-purple-400 mb-2 sm:mb-0">
               Relatório: {reportData.periodDescription}
             </h3>
             <button
               onClick={handlePrintReport} disabled={isGeneratingPdf}
-              className="print:hidden ml-4 px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="print:hidden ml-0 sm:ml-4 w-full sm:w-auto px-3 py-2 sm:px-4 sm:py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors flex items-center justify-center text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Gerar PDF do relatório"
             >
-              {isGeneratingPdf ? <LoadingSpinner size="w-5 h-5" /> : <PrinterIcon className="w-5 h-5 mr-2" />}
+              {isGeneratingPdf ? <LoadingSpinner size="w-4 h-4 sm:w-5 sm:h-5" /> : <PrinterIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />}
               {isGeneratingPdf ? "Gerando PDF..." : "Baixar PDF"}
             </button>
           </div>
           
-          <div id="report-content" className="text-gray-100 bg-gray-800 p-4 rounded-md">
+          <div id="report-content" className="text-gray-100 bg-gray-800 p-3 sm:p-4 rounded-md">
             <section>
-              <h4 className="text-xl font-medium text-gray-100 mb-4">Visão Geral</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <h4 className="text-lg sm:text-xl font-medium text-gray-100 mb-3 sm:mb-4">Visão Geral</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 <StatCard title="Total de Tickets Criados" value={reportData.totalTickets} icon={<TicketIcon className="w-6 h-6"/>} iconColorClass="text-purple-400" />
                 <StatCard title="Tickets Resolvidos" value={reportData.resolvedTickets} icon={<CheckCircleIcon className="w-6 h-6"/>} iconColorClass="text-indigo-400" />
                 <StatCard title="Tickets Abertos" value={reportData.openTickets} icon={<ClockIcon className="w-6 h-6"/>} iconColorClass="text-purple-500" />
@@ -287,11 +287,11 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ reportData, isReportLoading, 
               </div>
             </section>
 
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                  <div className="bg-gray-700 p-4 rounded-lg">
-                      <h4 className="text-lg font-medium text-gray-100 mb-3">Por Status</h4>
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
+                  <div className="bg-gray-700 p-3 sm:p-4 rounded-lg">
+                      <h4 className="text-md sm:text-lg font-medium text-gray-100 mb-2 sm:mb-3">Por Status</h4>
                       {reportData.ticketsByStatus.length > 0 ? (
-                          <ul className="space-y-1.5 text-sm">
+                          <ul className="space-y-1 sm:space-y-1.5 text-xs sm:text-sm">
                           {reportData.ticketsByStatus.map(item => (
                               <li key={item.status} className="flex justify-between items-center text-gray-300">
                                   <span className="flex items-center">{getStatusIcon(item.status)} {item.status}</span>
@@ -299,25 +299,25 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ reportData, isReportLoading, 
                               </li>
                           ))}
                           </ul>
-                      ) : <p className="text-sm text-gray-400">N/A</p>}
+                      ) : <p className="text-xs sm:text-sm text-gray-400">N/A</p>}
                   </div>
-                  <div className="bg-gray-700 p-4 rounded-lg">
-                      <h4 className="text-lg font-medium text-gray-100 mb-3">Por Categoria</h4>
+                  <div className="bg-gray-700 p-3 sm:p-4 rounded-lg">
+                      <h4 className="text-md sm:text-lg font-medium text-gray-100 mb-2 sm:mb-3">Por Categoria</h4>
                       {reportData.ticketsByCategory.length > 0 ? (
-                          <ul className="space-y-1.5 text-sm">
+                          <ul className="space-y-1 sm:space-y-1.5 text-xs sm:text-sm">
                           {reportData.ticketsByCategory.map(item => (
                               <li key={item.category} className="flex justify-between items-center text-gray-300">
-                                <span><span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${getCategoryColor(item.category)}`}></span>{item.category}</span>
+                                <span><span className={`inline-block w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full mr-1.5 sm:mr-2 ${getCategoryColor(item.category)}`}></span>{item.category}</span>
                                   <span className="font-semibold text-gray-100">{item.count}</span>
                               </li>
                           ))}
                           </ul>
-                      ) : <p className="text-sm text-gray-400">N/A</p>}
+                      ) : <p className="text-xs sm:text-sm text-gray-400">N/A</p>}
                   </div>
-                  <div className="bg-gray-700 p-4 rounded-lg">
-                      <h4 className="text-lg font-medium text-gray-100 mb-3">Por Urgência</h4>
+                  <div className="bg-gray-700 p-3 sm:p-4 rounded-lg">
+                      <h4 className="text-md sm:text-lg font-medium text-gray-100 mb-2 sm:mb-3">Por Urgência</h4>
                       {reportData.ticketsByUrgency.length > 0 ? (
-                          <ul className="space-y-1.5 text-sm">
+                          <ul className="space-y-1 sm:space-y-1.5 text-xs sm:text-sm">
                           {reportData.ticketsByUrgency.map(item => (
                               <li key={item.urgency} className="flex justify-between items-center text-gray-300">
                                 <span className="flex items-center">{getUrgencyIcon(item.urgency)} {item.urgency}</span>
@@ -325,18 +325,18 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ reportData, isReportLoading, 
                               </li>
                           ))}
                           </ul>
-                      ) : <p className="text-sm text-gray-400">N/A</p>}
+                      ) : <p className="text-xs sm:text-sm text-gray-400">N/A</p>}
                   </div>
             </section>
 
             {reportData.aiInsights && (
-              <section className="mt-8 ai-insights-section">
-                <h4 className="text-xl font-medium text-gray-100 mb-3 flex items-center">
-                  <SparklesIcon className="w-6 h-6 mr-2 text-purple-400" />
+              <section className="mt-6 sm:mt-8 ai-insights-section">
+                <h4 className="text-lg sm:text-xl font-medium text-gray-100 mb-2 sm:mb-3 flex items-center">
+                  <SparklesIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-purple-400" />
                   Insights da IA
                 </h4>
-                <div className="bg-gray-700 p-4 sm:p-6 rounded-lg shadow-inner">
-                  <div className="text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed ai-insights-content">
+                <div className="bg-gray-700 p-3 sm:p-4 md:p-6 rounded-lg shadow-inner">
+                  <div className="text-xs sm:text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed ai-insights-content">
                     {parseBoldMarkdown(reportData.aiInsights)}
                   </div>
                 </div>

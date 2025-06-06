@@ -1,4 +1,5 @@
 
+
 import { Chat } from "@google/genai";
 
 export enum IssueCategory {
@@ -177,6 +178,22 @@ export interface Contract {
   updated_at: Date | string;
 }
 
+// --- User Profile Types ---
+// From Supabase `profiles` table
+export interface UserProfile {
+    id: string; // Corresponds to auth.users.id
+    full_name: string | null;
+    role: 'Administrador' | 'Supervisor' | 'Técnico'; // As per user_role_enum
+    department: string | null;
+    updated_at: Date | string;
+    created_at?: Date | string; // Added created_at
+}
+
+// AppFeedback Interface
+export interface AppFeedback {
+  type: 'success' | 'error' | 'info' | 'warning';
+  message: string;
+}
 
 // Moved from App.tsx to be available for NavigationItemConfig
 export type ViewMode = 
@@ -185,7 +202,7 @@ export type ViewMode =
   'inventoryDashboard' | 'inventoryStockList' | 'inventoryDeployedList' | 
   'inventoryItemForm' |
   'contractsList' | 'contractForm' |
-  'help'; // Ensure 'help' is present
+  'help' | 'profile'; // Added 'profile'
 
 
 // For dynamic navigation

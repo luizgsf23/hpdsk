@@ -4,8 +4,8 @@ import { Ticket, Message as MessageType, UrgencyLevel, TicketStatus } from '../t
 import ChatMessage from './ChatMessage';
 import LoadingSpinner from './LoadingSpinner';
 import FeedbackAlert from './FeedbackAlert'; 
-import type { AppFeedback } from '../App'; 
-import { PaperAirplaneIcon, ArrowLeftIcon, BoltIcon, ExclamationTriangleIcon, Bars3BottomLeftIcon, EllipsisHorizontalIcon, SparklesIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
+import type { AppFeedback } from '../types'; 
+import { PaperAirplaneIcon, ArrowLeftIcon, BoltIcon, ExclamationTriangleIcon, Bars3BottomLeftIcon, EllipsisHorizontalIcon, SparklesIcon, ChevronDownIcon, ChevronUpIcon, ArrowPathIcon, LifebuoyIcon } from './icons';
 
 interface TicketDetailViewProps {
   ticket: Ticket;
@@ -94,6 +94,19 @@ const TicketDetailView: React.FC<TicketDetailViewProps> = ({
   const isLastAiMessageError = lastMessage?.sender === 'ai' &&
                                 !lastMessage.isStreaming &&
                                 (lastMessage.text?.toLowerCase().includes("erro") || lastMessage.text?.toLowerCase().includes("falha"));
+
+  const handleRetryLastUserMessage = async () => {
+    const lastUserMessage = ticket.conversation.filter(m => m.sender === 'user').pop();
+    if (isAiResponding) return;
+
+    if (lastUserMessage && lastUserMessage.text) {
+        const result = await onSendMessage(ticket.id, lastUserMessage.text);
+        handleShowFeedback(result); 
+    } else {
+        handleShowFeedback({type: 'warning', message: "Nenhuma mensagem anterior do usuário encontrada para reenviar."});
+    }
+  };
+
 
   return (
     <div className="p-2 sm:p-6 bg-gray-900 rounded-lg shadow-xl h-full flex flex-col overflow-hidden"> 
@@ -217,9 +230,40 @@ const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                 {isAiResponding ? <LoadingSpinner size="w-5 h-5" /> : <PaperAirplaneIcon className="w-5 h-5" />}
               </button>
             </form>
+          ) : isLastAiMessageError ? (
+             <div className="mt-auto pt-3 sm:pt-4 border-t border-gray-700 text-center p-3 space-y-3 bg-red-900/10 rounded-b-md">
+                <div className="flex items-center justify-center text-red-400">
+                    <ExclamationTriangleIcon className="w-6 h-6 mr-2" />
+                    <p className="font-semibold">A IA encontrou um problema.</p>
+                </div>
+                <p className="text-xs text-gray-300 italic">
+                    A última resposta da IA (visível acima na conversa) indicou um erro.
+                </p>
+                <div className="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-2">
+                    <button
+                    onClick={handleRetryLastUserMessage}
+                    disabled={isAiResponding || !ticket.conversation.find(m => m.sender === 'user')}
+                    className="w-full sm:w-auto px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                    <ArrowPathIcon className="w-4 h-4 mr-2" />
+                    Tentar Novamente
+                    </button>
+                    <button
+                    onClick={() => {
+                        const supportEmail = "suporte.hpdsk@example.com"; 
+                        const supportPhone = "(XX) XXXX-XXXX"; 
+                        alert(`Se o problema persistir, por favor, contate o suporte:\n\nEmail: ${supportEmail}\nTelefone: ${supportPhone}\n\nInclua o ID do Ticket: ${ticket.id} e uma descrição do problema.`);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 text-sm bg-gray-600 hover:bg-gray-500 text-white rounded-md transition-colors"
+                    >
+                    <LifebuoyIcon className="w-4 h-4 mr-2" />
+                    Contatar Suporte
+                    </button>
+                </div>
+            </div>
           ) : (
             <div className="mt-auto pt-3 sm:pt-4 border-t border-gray-700 text-center text-gray-400 p-2 sm:p-3"> 
-                {isLastAiMessageError ? "A IA encontrou um problema. Contate o suporte se persistir." : `Este ticket está ${ticket.status.toLowerCase()}. Não é possível enviar novas mensagens.`}
+                 {`Este ticket está ${ticket.status.toLowerCase()}. Não é possível enviar novas mensagens.`}
             </div>
           )}
         </div>

@@ -195,13 +195,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ tickets, tasks, onNavigat
   return (
     <div className="space-y-6 sm:space-y-8 pb-8 h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
       <div className="flex justify-between items-center mb-6 pt-2"> 
-        <h2 className="text-3xl font-semibold text-purple-400">Dashboard de Atendimento</h2>
+        <h2 className="text-2xl sm:text-3xl font-semibold text-purple-400">Dashboard de Atendimento</h2>
       </div>
 
       {/* Ticket Statistics */}
       <section>
         <h3 className="text-xl font-semibold text-purple-300 mb-4">Estatísticas de Tickets</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-5">
           <StatCard title="Total de Tickets" value={totalTickets} icon={<TicketIconSolid className="w-7 h-7" />} iconColorClass="text-purple-400"/>
           <StatCard title="Abertos" value={openTickets} icon={<ClockIcon className="w-7 h-7" />} iconColorClass="text-purple-500" />
           <StatCard title="Aguardando IA" value={pendingAiTickets} icon={<SparklesIcon className="w-7 h-7" />} iconColorClass="text-purple-600"/>
@@ -222,12 +222,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ tickets, tasks, onNavigat
       {/* Task Statistics */}
       <section className="mt-10">
         <h3 className="text-xl font-semibold text-purple-300 mb-4">Estatísticas de Tarefas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
           <StatCard title="Total de Tarefas" value={totalTasks} icon={<ClipboardDocumentListIcon className="w-7 h-7" />} iconColorClass="text-purple-400"/>
           <StatCard title="Tarefas Abertas" value={openTasks} icon={getTaskStatusIcon(TaskStatusEnum.ABERTO)} iconColorClass="text-purple-500"/>
           <StatCard title="Tarefas Pendentes" value={pendingTasks} icon={getTaskStatusIcon(TaskStatusEnum.PENDENTE)} iconColorClass="text-yellow-400"/>
           <StatCard title="Tarefas Concluídas" value={completedTasks} icon={getTaskStatusIcon(TaskStatusEnum.CONCLUIDO)} iconColorClass="text-indigo-400"/>
-          {/* <StatCard title="Em Andamento" value={inProgressTasks} icon={getTaskStatusIcon(TaskStatusEnum.EM_ANDAMENTO)} iconColorClass="text-blue-400"/> */}
         </div>
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
           <SimpleBarChart title="Tarefas por Status" items={tasksByStatusData} />

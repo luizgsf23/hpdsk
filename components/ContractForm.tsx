@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Contract } from '../types';
 import { PlusIcon, ArrowLeftIcon, CalendarDaysIcon } from './icons';
 import FeedbackAlert from './FeedbackAlert';
-import type { AppFeedback } from '../App';
+import type { AppFeedback } from '../types';
 
 export interface ContractFormData {
   companyName: string;
@@ -93,9 +93,9 @@ const ContractForm: React.FC<ContractFormProps> = ({
   const formTitle = initialContractData ? "Editar Contrato" : "Adicionar Novo Contrato";
 
   return (
-    <div className="p-6 bg-gray-800 rounded-lg shadow-xl max-w-3xl mx-auto h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-700">
+    <div className="p-4 md:p-6 bg-gray-800 rounded-lg shadow-xl max-w-3xl mx-auto h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-700">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-purple-400">{formTitle}</h2>
+        <h2 className="text-xl md:text-2xl font-semibold text-purple-400">{formTitle}</h2>
         <button onClick={onCancel} className="text-gray-400 hover:text-gray-200 transition-colors p-2 rounded-md hover:bg-gray-700" aria-label="Voltar">
           <ArrowLeftIcon className="w-6 h-6" />
         </button>
@@ -170,13 +170,13 @@ const ContractForm: React.FC<ContractFormProps> = ({
             placeholder="Detalhes do contrato, termos importantes, SLAs, etc." />
         </div>
         
-        <div className="flex justify-end pt-3">
+        <div className="flex flex-col sm:flex-row justify-end pt-3 space-y-3 sm:space-y-0 sm:space-x-3">
           <button type="button" onClick={onCancel} disabled={isLoading}
-            className="px-6 py-3 mr-3 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50">
+            className="w-full sm:w-auto px-6 py-3 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50">
             Cancelar
           </button>
           <button type="submit" disabled={isLoading}
-            className="px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+            className="w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
             {isLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <PlusIcon className="w-5 h-5 mr-2" />}
             {initialContractData ? "Salvar Alterações" : "Adicionar Contrato"}
           </button>

@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { HPDSKLogoIcon } from './icons';
 import LoadingSpinner from './LoadingSpinner';
 import FeedbackAlert from './FeedbackAlert';
-import type { AppFeedback } from '../App';
+import type { AppFeedback } from '../types';
 
 interface LoginPageProps {
   supabaseClient: SupabaseClient | null; // Allow null for robustness

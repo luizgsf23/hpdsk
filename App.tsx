@@ -1,14 +1,18 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Chat, Content } from "@google/genai"; // Added Content
-import type { GenerateContentResponse, Session } from "@google/genai"; // Assuming Session from genai is what you might need, adjust if it's from Supabase
+import type { GenerateContentResponse } from "@google/genai"; 
+import type { Session as SupabaseSession, User } from '@supabase/supabase-js'; // Supabase specific types
 import { 
     Ticket, Message, TicketStatus, IssueCategory, UrgencyLevel, ReportTimeFrame, ReportData,
     Task, TaskStatus as TaskStatusEnum, TaskPriority, TaskClassification,
     EquipmentItem, EquipmentType, EquipmentStatus as EquipmentStatusEnum, 
     Contract, 
     NavigationItemConfig,
-    ViewMode 
+    ViewMode,
+    UserProfile,
+    AppFeedback // Imported AppFeedback
 } from './types';
 import { reportService } from './services/reportService';
 import { supabase } from './services/supabaseClient'; 
@@ -32,7 +36,9 @@ import InventoryStockList from './components/InventoryStockList';
 import InventoryDeployedList from './components/InventoryDeployedList'; 
 import ContractList from './components/ContractList';
 import ContractForm, { ContractFormData as AppContractFormData } from './components/ContractForm';
-import HelpPage from './components/HelpPage'; // Added HelpPage
+import HelpPage from './components/HelpPage'; 
+import UserProfilePage from './components/UserProfilePage'; // Added UserProfilePage
+import HeaderBar from './components/HeaderBar'; // New HeaderBar for mobile
 import { 
     createChat as createAiChat, 
     generateStream as generateAiStream, 
@@ -40,13 +46,10 @@ import {
     geminiInitializationError 
 } from './services/geminiService';
 import { HELP_DESK_SYSTEM_INSTRUCTION, HELP_APP_SYSTEM_INSTRUCTION } from './constants';
-import { ChartBarIcon, TicketIcon, ClipboardDocumentListIcon, ArchiveBoxIcon, DocumentTextIcon, DocumentDuplicateIcon, LifebuoyIcon, HPDSKLogoIcon } from './components/icons';
+import { ChartBarIcon, TicketIcon, ClipboardDocumentListIcon, ArchiveBoxIcon, DocumentTextIcon, DocumentDuplicateIcon, LifebuoyIcon, UserCircleIcon, HPDSKLogoIcon } from './components/icons';
 
 
-export interface AppFeedback {
-  type: 'success' | 'error' | 'info' | 'warning';
-  message: string;
-}
+// AppFeedback interface moved to types.ts
 
 const mainNavItemsConfig: NavigationItemConfig[] = [
   { viewMode: 'dashboard', label: 'Dashboard', icon: ChartBarIcon, colorClass: 'bg-purple-600 hover:bg-purple-700' },
@@ -55,6 +58,7 @@ const mainNavItemsConfig: NavigationItemConfig[] = [
   { viewMode: 'inventoryDashboard', label: 'Inventário', icon: ArchiveBoxIcon, colorClass: 'bg-pink-600 hover:bg-pink-700' },
   { viewMode: 'contractsList', label: 'Contratos', icon: DocumentDuplicateIcon, colorClass: 'bg-cyan-600 hover:bg-cyan-700' },
   { viewMode: 'reports', label: 'Relatórios', icon: DocumentTextIcon, colorClass: 'bg-orange-600 hover:bg-orange-700' },
+  { viewMode: 'profile', label: 'Meu Perfil', icon: UserCircleIcon, colorClass: 'bg-slate-600 hover:bg-slate-700'}, // Added profile
   { viewMode: 'help', label: 'Ajuda', icon: LifebuoyIcon, colorClass: 'bg-gray-600 hover:bg-gray-700'}
 ];
 
@@ -85,7 +89,8 @@ export const App: React.FC = () => {
     return <ConfigurationErrorPage />;
   }
   
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<SupabaseSession | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null); 
   const [isSessionLoading, setIsSessionLoading] = useState(true);
 
 
@@ -103,13 +108,17 @@ export const App: React.FC = () => {
 
   const [currentAppView, setCurrentAppViewInternal] = useState<ViewMode>('home');
   
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
+
 
   const setViewMode = (newMode: ViewMode, feedback?: AppFeedback) => {
     if (feedback) { 
       sessionStorage.setItem('appFeedback', JSON.stringify(feedback));
     }
     setCurrentAppViewInternal(newMode);
+    if (isMobileView) setIsMobileMenuOpen(false); // Close mobile menu on navigation
   };
 
   const [isLoading, setIsLoading] = useState<boolean>(false); 
@@ -121,32 +130,79 @@ export const App: React.FC = () => {
   const [isTaskLoading, setIsTaskLoading] = useState<boolean>(false); 
   const [isEquipmentLoading, setIsEquipmentLoading] = useState<boolean>(false);
   const [isContractsLoading, setIsContractsLoading] = useState<boolean>(false);
+  const [isProfileLoading, setIsProfileLoading] = useState<boolean>(false); 
 
   const activeChatsRef = useRef<Map<string, Chat>>(new Map());
+
+  useEffect(() => {
+    const handleResize = () => {
+        const mobile = window.innerWidth < 768;
+        setIsMobileView(mobile);
+        if (!mobile) { // If resizing to desktop view
+            setIsMobileMenuOpen(false); // Ensure mobile overlay menu is closed
+        } else { // If resizing to mobile view
+            // setIsDesktopSidebarOpen(true); // Optionally reset desktop sidebar state or manage as needed
+        }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    if (!supabase || !userId) return;
+    setIsProfileLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      if (data) {
+        setUserProfile(parseSupabaseDataDates(data, ['updated_at', 'created_at']) as UserProfile);
+      } else {
+        setUserProfile(null); // Profile might not exist yet if trigger hasn't run
+      }
+    } catch (error: any) {
+      console.error("Error fetching user profile:", error.message);
+      setGlobalAppFeedback({type: 'error', message: `Erro ao buscar perfil: ${error.message}`});
+      setUserProfile(null); 
+    } finally {
+      setIsProfileLoading(false);
+    }
+  }, [supabase]);
   
   useEffect(() => {
     if (!supabase) {
       setIsSessionLoading(false);
       return;
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session as any); // Cast to any if Supabase Session type conflicts
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      if (currentSession?.user?.id) {
+        fetchUserProfile(currentSession.user.id);
+      }
       setIsSessionLoading(false);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session as any); // Cast to any if Supabase Session type conflicts
-        setIsSessionLoading(false);
-        if (!session) { // If user logs out, redirect to home (which will become login)
-            setCurrentAppViewInternal('home');
+      (_event, newSession) => {
+        setSession(newSession);
+        if (newSession?.user?.id) {
+            if (newSession.user.id !== session?.user?.id) { 
+                 fetchUserProfile(newSession.user.id);
+            }
+        } else {
+            setUserProfile(null); 
+            if (currentAppView !== 'home') setCurrentAppViewInternal('home'); // Redirect to home on logout if not already there
         }
+        // setIsSessionLoading(false); // This was causing quick flashes, better to keep session loading tied to initial getSession
       }
     );
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase, fetchUserProfile, session?.user?.id, currentAppView]);
 
 
   useEffect(() => {
@@ -178,7 +234,7 @@ export const App: React.FC = () => {
     const shouldFetchContracts = ['contractsList', 'contractForm', 'dashboard', 'reports'].includes(currentAppView);
 
     let isActive = true; 
-    setGlobalAppFeedback(null);
+    // setGlobalAppFeedback(null); // Removed this to persist feedback across navigations until explicitly cleared
 
     const fetchTicketsAndMessages = async () => {
       if (!shouldFetchTickets) return;
@@ -217,7 +273,6 @@ export const App: React.FC = () => {
                     text: dbMsg.text_content || dbMsg.text || '', 
                     timestamp: dbMsg.timestamp ? new Date(dbMsg.timestamp) : new Date(),
                     isStreaming: false, sender: sender,
-                    // updated_at is intentionally not mapped from db here for messages as it might not exist
                 };
                 if (!appMsg.id || !appMsg.ticket_id) return; 
                 const completeMessage = appMsg as Message;
@@ -250,10 +305,10 @@ export const App: React.FC = () => {
     if (shouldFetchContracts) fetchContractsScoped();
 
     return () => { isActive = false; };
-  }, [currentAppView, supabase, session]); // Add session as a dependency
+  }, [currentAppView, supabase, session]); 
 
   const fetchTasksScoped = useCallback(async () => {
-    if (!supabase || !session) return; // Check session
+    if (!supabase || !session) return; 
     setIsTaskLoading(true);
     const { data, error } = await supabase.from('tasks').select('*')
       .order('created_at', { ascending: false });
@@ -289,11 +344,11 @@ export const App: React.FC = () => {
       setTasks([]);
     }
     setIsTaskLoading(false);
-  }, [supabase, session]); // Add session
+  }, [supabase, session]); 
 
 
   const fetchEquipmentItemsScoped = useCallback(async () => {
-    if (!supabase || !session) return; // Check session
+    if (!supabase || !session) return; 
     setIsEquipmentLoading(true);
     const { data, error } = await supabase.from('equipment_items').select('*')
       .order('created_at', { ascending: false });
@@ -307,10 +362,10 @@ export const App: React.FC = () => {
         setEquipmentItems([]);
     }
     setIsEquipmentLoading(false);
-  }, [supabase, session]); // Add session
+  }, [supabase, session]); 
 
   const fetchContractsScoped = useCallback(async () => {
-    if (!supabase || !session) return; // Check session
+    if (!supabase || !session) return; 
     setIsContractsLoading(true);
     const { data, error } = await supabase.from('contracts').select('*')
       .order('renewal_or_expiry_date', { ascending: true });
@@ -325,10 +380,16 @@ export const App: React.FC = () => {
         setContracts(mappedData.map(c => parseSupabaseDataDates(c, ['created_at', 'updated_at', 'startDate', 'renewalOrExpiryDate', 'endDate'])) as Contract[]);
     }
     setIsContractsLoading(false);
-  }, [supabase, session]); // Add session
+  }, [supabase, session]); 
 
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const toggleSidebar = () => {
+    if (isMobileView) {
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+    } else {
+      setIsDesktopSidebarOpen(!isDesktopSidebarOpen);
+    }
+  };
 
   const handleSidebarNavigate = (newMode: ViewMode) => {
       setSelectedTicketId(null); 
@@ -345,8 +406,9 @@ export const App: React.FC = () => {
     if (error) {
         setGlobalAppFeedback({type: 'error', message: `Erro ao sair: ${error.message}`});
     } else {
-        setSession(null); // Should be handled by onAuthStateChange, but good for immediate UI update
-        setCurrentAppViewInternal('home'); // Navigate to home, which will show login
+        setSession(null); 
+        setUserProfile(null); 
+        setCurrentAppViewInternal('home'); 
         setGlobalAppFeedback({type: 'success', message: 'Você saiu com sucesso.'});
     }
   };
@@ -408,7 +470,6 @@ export const App: React.FC = () => {
               text_content: failText.trim(), 
               timestamp: new Date().toISOString(), 
               sender_type: 'ai',
-              // updated_at removed
             }).eq('id', initialAiMessageId);
             updateTicketConversationOptimistically(ticketId, undefined, TicketStatus.OPEN, initialAiMessageId, failText.trim(), true);
             setTickets(prevTickets => prevTickets.map(t => t.id === ticketId ? { ...t, status: TicketStatus.OPEN, updated_at: new Date() } : t));
@@ -432,7 +493,6 @@ export const App: React.FC = () => {
       const { error: messageError } = await supabase.from('messages').update({ 
         text_content: fullAiText, 
         timestamp: new Date().toISOString(),
-        // updated_at removed
       }).eq('id', initialAiMessageId); 
       if (messageError) throw messageError;
 
@@ -452,7 +512,6 @@ export const App: React.FC = () => {
         await supabase.from('messages').update({ 
           text_content: errorText, 
           timestamp: new Date().toISOString(),
-          // updated_at removed
         }).eq('id', initialAiMessageId);
         updateTicketConversationOptimistically(ticketId, undefined, TicketStatus.OPEN, initialAiMessageId, errorText.substring(fullAiText.length || 0), true);
         await supabase.from('tickets').update({ status: TicketStatus.OPEN, updated_at: new Date().toISOString() }).eq('id', ticketId);
@@ -590,7 +649,7 @@ Por favor, acuse o recebimento deste ticket, cumprimente o usuário ${newTicketF
       const errorMessageText = "Erro ao enviar mensagem para IA.";
       const { data: errDbMsg } = await supabase.from('messages').insert({ ticket_id: ticketId, sender_type: 'ai', text_content: errorMessageText, timestamp: new Date().toISOString() }).select().single();
       if(errDbMsg) updateTicketConversationOptimistically(ticketId, { id: errDbMsg.id as string, sender: 'ai', text: errorMessageText, timestamp: new Date(), ticket_id: ticketId }, TicketStatus.OPEN, undefined, undefined, true);
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: TicketStatus.OPEN } : t));
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: TicketStatus.OPEN, updated_at: new Date() } : t));
       setIsAiResponding(false);
       return { type: 'error', message: "Erro com IA: " + error.message };
     }
@@ -728,28 +787,42 @@ Por favor, acuse o recebimento deste ticket, cumprimente o usuário ${newTicketF
     setViewMode('inventoryStockList', { type: 'success', message: `Item "${updatedItemForState.name}" atualizado.` });
     return { type: 'success', message: `Item atualizado.` };
   };
-
-  const handleCreateContract = async (contractData: AppContractFormData): Promise<AppFeedback & { contractId?: string }> => {
+  
+  const handleCreateContract = async (contractData: Omit<Contract, 'id' | 'created_at' | 'updated_at'>): Promise<AppFeedback & { contractId?: string }> => {
     if (!supabase) return { type: 'error', message: 'Cliente Supabase não inicializado.' };
     setIsContractsLoading(true);
+    setGlobalAppFeedback(null);
     const newContractPayload = {
-      company_name: contractData.companyName, contract_number: contractData.contractNumber, product_or_service_name: contractData.productOrServiceName,
-      contract_value: contractData.contractValue, start_date: contractData.startDate, renewal_or_expiry_date: contractData.renewalOrExpiryDate,
-      end_date: contractData.endDate || null, description: contractData.description, expiry_notification_days: contractData.expiryNotificationDays,
+        company_name: contractData.companyName,
+        contract_number: contractData.contractNumber,
+        product_or_service_name: contractData.productOrServiceName,
+        contract_value: contractData.contractValue,
+        start_date: contractData.startDate,
+        renewal_or_expiry_date: contractData.renewalOrExpiryDate,
+        end_date: contractData.endDate || null,
+        description: contractData.description || null,
+        expiry_notification_days: contractData.expiryNotificationDays
     };
+
     const { data: createdContract, error } = await supabase.from('contracts').insert(newContractPayload).select().single();
     setIsContractsLoading(false);
     if (error || !createdContract) return { type: 'error', message: 'Falha ao criar contrato: ' + error?.message };
+    
+    const newContractForState = parseSupabaseDataDates({
+        ...createdContract, companyName: createdContract.company_name, contractNumber: createdContract.contract_number, productOrServiceName: createdContract.product_or_service_name,
+        contractValue: createdContract.contract_value, startDate: createdContract.start_date, renewalOrExpiryDate: createdContract.renewal_or_expiry_date,
+        endDate: createdContract.end_date, expiryNotificationDays: createdContract.expiry_notification_days
+    }, ['created_at', 'updated_at', 'startDate', 'renewalOrExpiryDate', 'endDate']) as Contract;
 
-    const newContractForState = parseSupabaseDataDates({ ...createdContract, companyName: createdContract.company_name, contractNumber: createdContract.contract_number, productOrServiceName: createdContract.product_or_service_name, contractValue: createdContract.contract_value, startDate: createdContract.start_date, renewalOrExpiryDate: createdContract.renewal_or_expiry_date, endDate: createdContract.end_date, expiryNotificationDays: createdContract.expiry_notification_days }, ['created_at', 'updated_at', 'startDate', 'renewalOrExpiryDate', 'endDate']) as Contract;
-    setContracts(prev => [newContractForState, ...prev].sort((a,b) => new Date(b.renewalOrExpiryDate).getTime() - new Date(a.renewalOrExpiryDate).getTime()));
-    setViewMode('contractsList', { type: 'success', message: `Contrato "${newContractForState.contractNumber}" criado.` });
-    return { type: 'success', message: `Contrato criado.`, contractId: newContractForState.id };
+    setContracts(prev => [newContractForState, ...prev].sort((a,b) => new Date(a.renewalOrExpiryDate).getTime() - new Date(b.renewalOrExpiryDate).getTime()));
+    setViewMode('contractsList', { type: 'success', message: `Contrato "${newContractForState.contractNumber}" adicionado.` });
+    return { type: 'success', message: `Contrato adicionado.`, contractId: newContractForState.id };
   };
 
-  const handleUpdateContract = async (contractId: string, contractData: Partial<AppContractFormData>): Promise<AppFeedback> => {
+  const handleUpdateContract = async (contractId: string, contractData: Partial<Omit<Contract, 'id' | 'created_at'>>): Promise<AppFeedback> => {
     if (!supabase) return { type: 'error', message: 'Cliente Supabase não inicializado.' };
     setIsContractsLoading(true);
+    setGlobalAppFeedback(null);
     const updatePayload: any = { updated_at: new Date().toISOString() };
     if (contractData.companyName !== undefined) updatePayload.company_name = contractData.companyName;
     if (contractData.contractNumber !== undefined) updatePayload.contract_number = contractData.contractNumber;
@@ -758,219 +831,268 @@ Por favor, acuse o recebimento deste ticket, cumprimente o usuário ${newTicketF
     if (contractData.startDate !== undefined) updatePayload.start_date = contractData.startDate;
     if (contractData.renewalOrExpiryDate !== undefined) updatePayload.renewal_or_expiry_date = contractData.renewalOrExpiryDate;
     if (contractData.endDate !== undefined) updatePayload.end_date = contractData.endDate || null;
-    if (contractData.description !== undefined) updatePayload.description = contractData.description;
+    if (contractData.description !== undefined) updatePayload.description = contractData.description || null;
     if (contractData.expiryNotificationDays !== undefined) updatePayload.expiry_notification_days = contractData.expiryNotificationDays;
-    
+
     const { data: updatedContract, error } = await supabase.from('contracts').update(updatePayload).eq('id', contractId).select().single();
     setIsContractsLoading(false);
     if (error || !updatedContract) return { type: 'error', message: 'Falha ao atualizar contrato: ' + error?.message };
     
-    const updatedContractForState = parseSupabaseDataDates({ ...updatedContract, companyName: updatedContract.company_name, contractNumber: updatedContract.contract_number, productOrServiceName: updatedContract.product_or_service_name, contractValue: updatedContract.contract_value, startDate: updatedContract.start_date, renewalOrExpiryDate: updatedContract.renewal_or_expiry_date, endDate: updatedContract.end_date, expiryNotificationDays: updatedContract.expiry_notification_days }, ['created_at', 'updated_at', 'startDate', 'renewalOrExpiryDate', 'endDate']) as Contract;
-    setContracts(prev => prev.map(c => (c.id === contractId ? updatedContractForState : c)).sort((a,b) => new Date(b.renewalOrExpiryDate).getTime() - new Date(a.renewalOrExpiryDate).getTime()));
+    const updatedContractForState = parseSupabaseDataDates({
+      ...updatedContract, companyName: updatedContract.company_name, contractNumber: updatedContract.contract_number, productOrServiceName: updatedContract.product_or_service_name,
+      contractValue: updatedContract.contract_value, startDate: updatedContract.start_date, renewalOrExpiryDate: updatedContract.renewal_or_expiry_date,
+      endDate: updatedContract.end_date, expiryNotificationDays: updatedContract.expiry_notification_days
+    }, ['created_at', 'updated_at', 'startDate', 'renewalOrExpiryDate', 'endDate']) as Contract;
+
+    setContracts(prev => prev.map(c => (c.id === contractId ? updatedContractForState : c)).sort((a,b) => new Date(a.renewalOrExpiryDate).getTime() - new Date(b.renewalOrExpiryDate).getTime()));
     setViewMode('contractsList', { type: 'success', message: `Contrato "${updatedContractForState.contractNumber}" atualizado.` });
     return { type: 'success', message: `Contrato atualizado.` };
   };
   
+  const handleUpdateUserProfile = async (userId: string, dataToUpdate: { full_name?: string | null; department?: string | null }): Promise<AppFeedback> => {
+    if (!supabase || !userId) return { type: 'error', message: 'Usuário não autenticado ou Supabase não disponível.' };
+    setIsProfileLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ ...dataToUpdate, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select()
+        .single();
 
-  const mainContentMargin = 'm-0 sm:m-5'; 
-  const selectedTicket = tickets.find(t => t.id === selectedTicketId);
-  const selectedTaskForForm = tasks.find(t => t.id === selectedTaskId);
-  const selectedEquipmentItemForForm = equipmentItems.find(i => i.id === selectedEquipmentItemId);
-  const selectedContractForForm = contracts.find(c => c.id === selectedContractId);
+      if (error) throw error;
+      if (data) {
+        const updatedProfile = parseSupabaseDataDates(data, ['updated_at', 'created_at']) as UserProfile;
+        setUserProfile(updatedProfile); // Update local state
+        return { type: 'success', message: 'Perfil atualizado com sucesso!' };
+      }
+      throw new Error('Falha ao atualizar perfil, nenhum dado retornado.');
+    } catch (error: any) {
+      return { type: 'error', message: `Erro ao atualizar perfil: ${error.message}` };
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
 
-  const showGeneralLoadingSpinner = 
-    (currentAppView === 'list' && isLoading && tickets.length === 0) ||
-    (currentAppView === 'tasks' && isTaskLoading && tasks.length === 0) ||
-    (currentAppView === 'contractsList' && isContractsLoading && contracts.length === 0) ||
-    (currentAppView === 'dashboard' && (isLoading || isTaskLoading || isEquipmentLoading || isContractsLoading) && tickets.length === 0 && tasks.length === 0 && equipmentItems.length === 0 && contracts.length === 0) ||
-    (currentAppView === 'reports' && !reportData && (isReportLoading || isLoading || isTaskLoading || isEquipmentLoading || isContractsLoading)) ||
-    (currentAppView.startsWith('inventory') && 
-     !['inventoryDashboard', 'inventoryItemForm'].includes(currentAppView) &&
-     isEquipmentLoading && 
-     ((currentAppView === 'inventoryStockList' && equipmentItems.length === 0) ||
-      (currentAppView === 'inventoryDeployedList' && equipmentItems.length === 0))
-    ) ||
-    (currentAppView === 'inventoryDashboard' && isEquipmentLoading && equipmentItems.length === 0);
+  const handleUpdateUserPassword = async (newPassword: string): Promise<AppFeedback> => {
+    if (!supabase) return { type: 'error', message: 'Supabase não disponível.' };
+    setIsProfileLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      return { type: 'success', message: 'Senha alterada com sucesso!' };
+    } catch (error: any) {
+      return { type: 'error', message: `Erro ao alterar senha: ${error.message}` };
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
 
+
+  // --- Content Rendering Logic ---
+  let content;
   if (isSessionLoading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white">
-        <HPDSKLogoIcon className="w-20 h-20 mb-4 animate-pulse" />
-        <LoadingSpinner size="w-10 h-10" />
-        <p className="mt-3 text-lg">Verificando sessão...</p>
+    content = (
+      <div className="flex flex-col items-center justify-center h-full">
+        <LoadingSpinner size="w-12 h-12" />
+        <p className="mt-3 text-gray-400">Carregando sessão...</p>
       </div>
     );
-  }
-
-  if (!session) {
-    return <LoginPage supabaseClient={supabase} setGlobalAppFeedback={setGlobalAppFeedback} />;
-  }
-  
-  return (
-    <div className="min-h-screen flex bg-gray-900 text-gray-100 transition-colors duration-300">
-      <SidebarNav
-        isOpen={isSidebarOpen}
-        toggleSidebar={toggleSidebar}
-        currentView={currentAppView}
-        onNavigate={handleSidebarNavigate}
-        navItems={mainNavItemsConfig} 
-        onLogout={handleLogout}
-      />
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${mainContentMargin}`}>
-        {globalAppFeedback && (
-          <div className="p-0 print:hidden">
-            <FeedbackAlert 
-                type={globalAppFeedback.type} 
-                message={globalAppFeedback.message} 
-                onDismiss={() => setGlobalAppFeedback(null)} 
-            />
+  } else if (!session) {
+    content = <LoginPage supabaseClient={supabase} setGlobalAppFeedback={setGlobalAppFeedback} />;
+  } else {
+    switch (currentAppView) {
+      case 'home':
+        content = <HomePage onNavigate={handleSidebarNavigate} navItems={mainNavItemsConfig} />;
+        break;
+      case 'list':
+        content = (
+          <TicketList
+            tickets={tickets}
+            selectedTicketId={selectedTicketId}
+            onSelectTicket={(id) => { setSelectedTicketId(id); setViewMode('detail'); }}
+            onNewTicket={() => setViewMode('form')}
+            isLoading={isLoading}
+          />
+        );
+        break;
+      case 'form':
+        content = (
+          <TicketForm
+            onSubmitTicket={handleCreateTicket}
+            onCancel={() => setViewMode(selectedTicketId ? 'detail' : 'list')}
+            isLoading={isAiResponding || isLoading}
+          />
+        );
+        break;
+      case 'detail':
+        const selectedTicket = tickets.find(t => t.id === selectedTicketId);
+        content = selectedTicket ? (
+          <TicketDetailView
+            ticket={selectedTicket}
+            onSendMessage={handleSendMessage}
+            onBackToList={() => { setSelectedTicketId(null); setViewMode('list'); }}
+            isAiResponding={isAiResponding}
+            onChangeStatus={handleChangeTicketStatus}
+            initialFeedback={globalAppFeedback}
+            clearInitialFeedback={() => setGlobalAppFeedback(null)}
+          />
+        ) : (
+          <div className="p-6 text-center text-gray-300">
+             {isLoading ? <LoadingSpinner /> : "Ticket não encontrado ou ID inválido."}
           </div>
-        )}
-        <main className="flex-grow p-0 overflow-y-auto">
-            {showGeneralLoadingSpinner && (
-                <div className="flex justify-center items-center h-full">
-                    <LoadingSpinner size="w-12 h-12" />
-                    <p className="ml-3 text-gray-300">Carregando...</p>
-                </div>
-            )}
-            {currentAppView === 'home' && !showGeneralLoadingSpinner && ( 
-                <HomePage onNavigate={handleSidebarNavigate} navItems={mainNavItemsConfig} />
-            )}
-            {currentAppView === 'dashboard' && !showGeneralLoadingSpinner && (
-                <DashboardView 
-                    tickets={tickets} 
-                    tasks={tasks} 
-                    onNavigateToList={() => handleSidebarNavigate('list')} 
-                    onNavigateToTasks={() => handleSidebarNavigate('tasks')}
-                />
-            )}
-            {currentAppView === 'reports' && !showGeneralLoadingSpinner && (
-                <ReportsPage
-                    allTickets={tickets} reportData={reportData} isReportLoading={isReportLoading}
-                    onGenerateReport={handleGenerateReport}
-                />
-            )}
-            {currentAppView === 'help' && !showGeneralLoadingSpinner && (
-                 <HelpPage />
-            )}
-            {currentAppView === 'list' && !showGeneralLoadingSpinner && (
-                <TicketList 
-                    tickets={tickets} selectedTicketId={selectedTicketId} 
-                    onSelectTicket={(id) => { setSelectedTicketId(id); setViewMode('detail');}} 
-                    onNewTicket={() => { setSelectedTicketId(null); setViewMode('form');}} 
-                    isLoading={isLoading && tickets.length === 0} 
-                />
-            )}
-            {currentAppView === 'form' && ( 
-                <TicketForm 
-                    onSubmitTicket={handleCreateTicket} 
-                    onCancel={() => handleSidebarNavigate('list')} 
-                    isLoading={isAiResponding} 
-                />
-            )}
-            {currentAppView === 'detail' && selectedTicket && ( 
-                <TicketDetailView
-                    ticket={selectedTicket} 
-                    onSendMessage={handleSendMessage} 
-                    onBackToList={() => handleSidebarNavigate('list')}
-                    isAiResponding={isAiResponding && selectedTicket.conversation.some(m => m.isStreaming)}
-                    onChangeStatus={handleChangeTicketStatus}
-                    initialFeedback={globalAppFeedback}
-                    clearInitialFeedback={() => setGlobalAppFeedback(null)}
-                />
-            )}
-             {currentAppView === 'detail' && !selectedTicket && !isLoading && tickets.length > 0 && (
-                 <div className="flex-grow flex flex-col items-center justify-center text-gray-400 p-10 text-center">
-                    <p className="text-xl">Selecione um ticket da lista para ver os detalhes.</p>
-                </div>
-            )}
-
-            {currentAppView === 'tasks' && !showGeneralLoadingSpinner && (
-              <TaskList
-                tasks={tasks}
-                onNewTask={() => { setSelectedTaskId(null); setViewMode('taskForm'); }}
-                onEditTask={(id) => { setSelectedTaskId(id); setViewMode('taskForm'); }}
-                isLoading={isTaskLoading && tasks.length === 0}
-              />
-            )}
-            {currentAppView === 'taskForm' && ( 
-              <TaskForm
-                onSubmitTask={async (data: AppTaskFormData) => { 
-                  if (selectedTaskId) { 
-                    return handleUpdateTask(selectedTaskId, data);
-                  } else { 
-                    const taskToCreate: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
-                        name: data.name!, subject: data.subject!, description: data.description!,
-                        status: data.status || TaskStatusEnum.ABERTO, department: data.department!,
-                        startDate: data.startDate!, dueDate: data.dueDate!,
-                        priority: data.priority || TaskPriority.MEDIA, classification: data.classification || TaskClassification.OUTRO,
-                    };
-                    return handleCreateTask(taskToCreate);
-                  }
-                }}
-                onCancel={() => { setSelectedTaskId(null); setViewMode('tasks');}}
+        );
+        break;
+      case 'dashboard':
+        content = <DashboardView tickets={tickets} tasks={tasks} onNavigateToList={() => setViewMode('list')} onNavigateToTasks={() => setViewMode('tasks')} />;
+        break;
+      case 'reports':
+        content = <ReportsPage allTickets={tickets} reportData={reportData} isReportLoading={isReportLoading} onGenerateReport={handleGenerateReport} />;
+        break;
+      case 'tasks':
+        content = (
+            <TaskList 
+                tasks={tasks} 
                 isLoading={isTaskLoading} 
-                initialTaskData={selectedTaskForForm}
-              />
-            )}
-
-            {currentAppView === 'inventoryDashboard' && !showGeneralLoadingSpinner && (
-              <InventoryDashboardView
-                equipmentItems={equipmentItems}
-                onNavigate={(view) => { if (view === 'inventoryItemForm') setSelectedEquipmentItemId(null); handleSidebarNavigate(view); }}
-              />
-            )}
-            {currentAppView === 'inventoryItemForm' && (
-                 <InventoryItemForm
-                    onSubmitItem={async (data: AppInventoryItemFormData) => { 
-                        if (selectedEquipmentItemId) return handleUpdateEquipmentItem(selectedEquipmentItemId, data);
-                        else {
-                            const itemToCreate: Omit<EquipmentItem, 'id' | 'created_at' | 'updated_at'> = { ...data };
-                            return handleCreateEquipmentItem(itemToCreate);
-                        }
-                    }}
-                    onCancel={() => { setSelectedEquipmentItemId(null); setViewMode('inventoryDashboard');}}
+                onNewTask={() => { setSelectedTaskId(null); setViewMode('taskForm');}}
+                onEditTask={(id) => { setSelectedTaskId(id); setViewMode('taskForm');}}
+            />
+        );
+        break;
+      case 'taskForm':
+        const selectedTask = tasks.find(t => t.id === selectedTaskId);
+        content = (
+            <TaskForm 
+                onSubmitTask={selectedTask ? (data) => handleUpdateTask(selectedTask.id, data) : handleCreateTask}
+                onCancel={() => { setSelectedTaskId(null); setViewMode('tasks'); }}
+                isLoading={isTaskLoading}
+                initialTaskData={selectedTask}
+            />
+        );
+        break;
+      case 'inventoryDashboard':
+        content = <InventoryDashboardView equipmentItems={equipmentItems} onNavigate={handleSidebarNavigate} />;
+        break;
+      case 'inventoryStockList':
+        content = <InventoryStockList 
+                        equipmentItems={equipmentItems} 
+                        onNavigate={handleSidebarNavigate}
+                        isLoading={isEquipmentLoading}
+                        onAddItem={() => { setSelectedEquipmentItemId(null); setViewMode('inventoryItemForm'); }}
+                        onEditItem={(id) => { setSelectedEquipmentItemId(id); setViewMode('inventoryItemForm'); }}
+                  />;
+        break;
+      case 'inventoryDeployedList':
+        content = <InventoryDeployedList equipmentItems={equipmentItems} onNavigate={handleSidebarNavigate} isLoading={isEquipmentLoading}/>;
+        break;
+      case 'inventoryItemForm':
+        const selectedItem = equipmentItems.find(i => i.id === selectedEquipmentItemId);
+        content = <InventoryItemForm 
+                    onSubmitItem={selectedItem ? (data) => handleUpdateEquipmentItem(selectedItem.id, data) : handleCreateEquipmentItem}
+                    onCancel={() => { setSelectedEquipmentItemId(null); setViewMode('inventoryStockList'); }}
                     isLoading={isEquipmentLoading}
-                    initialItemData={selectedEquipmentItemForForm}
-                 />
-            )}
-            {currentAppView === 'inventoryStockList' && !showGeneralLoadingSpinner && (
-                <InventoryStockList 
-                    equipmentItems={equipmentItems.filter(item => item.status === EquipmentStatusEnum.EM_ESTOQUE || item.status === EquipmentStatusEnum.PEDIDO)} 
-                    onNavigate={handleSidebarNavigate}
-                    onEditItem={(id) => { setSelectedEquipmentItemId(id); setViewMode('inventoryItemForm'); }}
-                    onAddItem={() => { setSelectedEquipmentItemId(null); setViewMode('inventoryItemForm');}}
-                    isLoading={isEquipmentLoading && equipmentItems.length === 0}
+                    initialItemData={selectedItem}
+                  />;
+        break;
+      case 'contractsList':
+        content = <ContractList 
+                    contracts={contracts}
+                    isLoading={isContractsLoading}
+                    onNewContract={() => {setSelectedContractId(null); setViewMode('contractForm');}}
+                    onEditContract={(id) => {setSelectedContractId(id); setViewMode('contractForm');}}
+                  />;
+        break;
+      case 'contractForm':
+        const selectedContract = contracts.find(c => c.id === selectedContractId);
+        content = <ContractForm 
+                    onSubmitContract={selectedContract ? (data) => handleUpdateContract(selectedContract.id, data) : handleCreateContract}
+                    onCancel={() => {setSelectedContractId(null); setViewMode('contractsList');}}
+                    isLoading={isContractsLoading}
+                    initialContractData={selectedContract}
+                  />;
+        break;
+      case 'help':
+        content = <HelpPage />;
+        break;
+      case 'profile':
+        content = <UserProfilePage 
+                    session={session} 
+                    userProfile={userProfile}
+                    isProfileLoading={isProfileLoading}
+                    onUpdateProfile={handleUpdateUserProfile}
+                    onUpdatePassword={handleUpdateUserPassword}
+                    onBack={() => setViewMode('dashboard')} // Or 'home'
+                    setGlobalAppFeedback={setGlobalAppFeedback}
+                  />;
+        break;
+      default:
+        content = <HomePage onNavigate={handleSidebarNavigate} navItems={mainNavItemsConfig} />;
+    }
+  }
+
+  // Hide initial load indicator once React is ready
+  useEffect(() => {
+    const initialLoadIndicator = document.getElementById('initial-load-indicator');
+    if (initialLoadIndicator) {
+      initialLoadIndicator.style.display = 'none';
+    }
+  }, []);
+
+  const sidebarCurrentOpenState = isMobileView ? isMobileMenuOpen : isDesktopSidebarOpen;
+  const mainContentPaddingClass = isMobileView ? 'pl-0' : (isDesktopSidebarOpen ? 'pl-60' : 'pl-20');
+
+
+  return (
+    <div className={`flex h-screen bg-gray-900 ${isMobileView && isMobileMenuOpen ? 'overflow-hidden' : ''}`}>
+      {session && (
+        <SidebarNav 
+          isOpen={sidebarCurrentOpenState}
+          isMobile={isMobileView}
+          toggleSidebar={toggleSidebar}
+          currentView={currentAppView}
+          onNavigate={handleSidebarNavigate}
+          navItems={mainNavItemsConfig}
+          onLogout={handleLogout}
+          closeMobileMenu={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      {/* Overlay for mobile menu */}
+      {isMobileView && isMobileMenuOpen && (
+          <div 
+              className="fixed inset-0 z-30 bg-black/50 md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-hidden="true"
+          ></div>
+      )}
+
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${mainContentPaddingClass}`}>
+        {session && isMobileView && (
+            <HeaderBar 
+                onToggleSidebar={() => setIsMobileMenuOpen(true)} 
+                pageTitle={mainNavItemsConfig.find(item => item.viewMode === currentAppView)?.label || "HPDSK"}
+            />
+        )}
+        <main className={`flex-1 p-3 sm:p-6 overflow-y-auto bg-gray-900`}>
+            {globalAppFeedback && session && currentAppView !== 'detail' && ( 
+                <FeedbackAlert 
+                    type={globalAppFeedback.type} 
+                    message={globalAppFeedback.message} 
+                    onDismiss={() => setGlobalAppFeedback(null)}
+                    className="mb-4" 
                 />
             )}
-            {currentAppView === 'inventoryDeployedList' && !showGeneralLoadingSpinner && (
-                <InventoryDeployedList 
-                    equipmentItems={equipmentItems.filter(item => item.status === EquipmentStatusEnum.EM_USO || item.status === EquipmentStatusEnum.EMPRESTADO || item.status === EquipmentStatusEnum.EM_MANUTENCAO)} 
-                    onNavigate={handleSidebarNavigate}
-                    isLoading={isEquipmentLoading && equipmentItems.length === 0}
-                />
-            )}
-            
-            {currentAppView === 'contractsList' && !showGeneralLoadingSpinner && (
-              <ContractList
-                contracts={contracts} isLoading={isContractsLoading}
-                onNewContract={() => { setSelectedContractId(null); setViewMode('contractForm'); }}
-                onEditContract={(id) => { setSelectedContractId(id); setViewMode('contractForm'); }}
-              />
-            )}
-            {currentAppView === 'contractForm' && (
-              <ContractForm
-                onSubmitContract={async (data: AppContractFormData) => {  
-                  if (selectedContractId) return handleUpdateContract(selectedContractId, data);
-                  else return handleCreateContract(data);
-                }}
-                onCancel={() => { setSelectedContractId(null); setViewMode('contractsList'); }}
-                isLoading={isContractsLoading}
-                initialContractData={selectedContractForForm}
-              />
-            )}
+            <div className={`${!session ? 'h-full' : 'bg-gray-900 h-full'}`}>
+            {content}
+            </div>
         </main>
       </div>
     </div>
   );
 };
+
+// Supabase types might already be imported globally, but explicit import is safer.
+export type { User, SupabaseSession };
+export type TicketFormData = AppTicketFormData;
+export type TaskFormData = AppTaskFormData;
+export type InventoryItemFormData = AppInventoryItemFormData;
+export type ContractFormData = AppContractFormData;

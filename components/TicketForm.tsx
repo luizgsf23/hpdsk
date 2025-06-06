@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { IssueCategory, UrgencyLevel } from '../types'; 
 import { PlusIcon, ArrowLeftIcon } from './icons';
 import FeedbackAlert from './FeedbackAlert'; 
-import type { AppFeedback } from '../App'; 
+import type { AppFeedback } from '../types'; 
 
 export interface TicketFormData {
   userName: string; 
@@ -58,9 +58,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmitTicket, onCancel, isLoa
   };
 
   return (
-    <div className="p-6 bg-gray-800 rounded-lg shadow-xl max-w-2xl mx-auto h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-700">
+    <div className="p-4 md:p-6 bg-gray-800 rounded-lg shadow-xl max-w-2xl mx-auto h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-700">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-purple-400">Abrir Novo Ticket de Suporte</h2>
+        <h2 className="text-xl md:text-2xl font-semibold text-purple-400">Abrir Novo Ticket de Suporte</h2>
         <button
             onClick={onCancel}
             className="text-gray-400 hover:text-gray-200 transition-colors p-2 rounded-md hover:bg-gray-700"
@@ -79,7 +79,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmitTicket, onCancel, isLoa
         />
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
         <div>
           <label htmlFor="userName" className="block text-sm font-medium text-gray-300 mb-1">Seu Nome <span className="text-red-500">*</span></label>
           <input
@@ -106,7 +106,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmitTicket, onCancel, isLoa
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
           <div>
             <label htmlFor="category" className="block text-sm font-medium text-gray-300 mb-1">Categoria do Problema</label>
             <select
@@ -146,19 +146,19 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmitTicket, onCancel, isLoa
             required
           />
         </div>
-        <div className="flex justify-end pt-2">
+        <div className="flex flex-col sm:flex-row justify-end pt-2 space-y-3 sm:space-y-0 sm:space-x-3">
           <button
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="px-6 py-3 mr-3 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-3 border border-gray-600 text-gray-300 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isLoading} 
-            className="px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
